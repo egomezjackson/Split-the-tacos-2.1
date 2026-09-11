@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Split the bill",
+  title: "Split the tacos",
   description: "Everyone pays for what they ate, tax and tip included.",
 };
 
@@ -149,6 +149,7 @@ input:focus{border-color:var(--marine);outline:none;}
 .pwv{flex:1;min-width:0;overflow-wrap:anywhere;}
 a.pwv{color:var(--marine);font-weight:600;text-underline-offset:2px;}
 .pwv.sel{-webkit-user-select:all;user-select:all;}
+.payhead{display:flex;gap:7px;font-size:12px;color:var(--ink2);font-weight:500;margin-bottom:4px;}
 
 /* the global input rule makes everything full width; checkboxes opt out */
 input[type=checkbox]{width:20px;height:20px;flex:0 0 20px;margin:0;padding:0;
