@@ -102,7 +102,12 @@ function NewBill() {
   const totalTooLow = totalCents > 0 && tipCents < 0;
   const tipOdd = totalCents > 0 && tipCents >= 0 && (pctFood > 40 || (pctFood < 5 && tipCents > 0));
 
-  const ready = name.trim() && items.length > 0 && totalCents > 0 && !totalTooLow;
+  // A payment row needs both halves: which app, and where to send it. Half a
+  // row is what made guests see a phone number with no idea which app it's for.
+  const payHalf = (p) => !!p.label.trim() !== !!p.value.trim();
+  const payIncomplete = pay.some(payHalf);
+
+  const ready = name.trim() && items.length > 0 && totalCents > 0 && !totalTooLow && !payIncomplete;
 
   const create = async () => {
     setCreating(true);
@@ -145,7 +150,7 @@ function NewBill() {
   return (
     <div className="page">
       <div className="wrap">
-        <h1>Split the bill</h1>
+        <h1>Split the tacos</h1>
         <p className="sub">
           Photograph the receipt, share the code, everyone taps what they had. Tax and tip
           get split by what you ordered, not down the middle.
@@ -188,8 +193,8 @@ function NewBill() {
           <>
             {/* ---- the one number they read off the paper ---- */}
             <div className="sechead">
-              <h2>What did you write at the bottom?</h2>
-              <span>The total, in pen</span>
+              <h2>What was the total?</h2>
+              <span>Including tip, taxes and card fees</span>
             </div>
 
             <div className="totalbox">
@@ -307,33 +312,46 @@ function NewBill() {
                 <span>Optional, up to {MAX_PAY}</span>
               </div>
 
+              {/* Headings, not placeholders: grey example text in the box read as
+                  something already filled in. */}
+              <div className="payhead">
+                <span style={{ flex: "0 0 112px" }}>App name</span>
+                <span>Link, username or phone</span>
+              </div>
               {pay.map((p, i) => (
-                <div key={i} style={{ display: "flex", gap: 7, marginBottom: 6 }}>
-                  <input
-                    value={p.label}
-                    placeholder={["Venmo", "Zelle", "Wise"][i]}
-                    aria-label="App"
-                    style={{ width: 104, flex: "0 0 104px" }}
-                    onChange={(e) => setPayRow(i, { label: e.target.value })}
-                  />
-                  <input
-                    value={p.value}
-                    placeholder="Link, @username or phone"
-                    aria-label="Where to send it"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    onChange={(e) => setPayRow(i, { value: e.target.value })}
-                  />
-                  <button
-                    className="x"
-                    aria-label="Remove"
-                    onClick={() =>
-                      setPay(pay.length > 1 ? pay.filter((_, k) => k !== i) : [{ label: "", value: "" }])
-                    }
-                  >
-                    ×
-                  </button>
+                <div key={i} style={{ marginBottom: 6 }}>
+                  <div style={{ display: "flex", gap: 7 }}>
+                    <input
+                      value={p.label}
+                      aria-label="App name"
+                      style={{ width: 112, flex: "0 0 112px" }}
+                      onChange={(e) => setPayRow(i, { label: e.target.value })}
+                    />
+                    <input
+                      value={p.value}
+                      aria-label="Link, username or phone"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      onChange={(e) => setPayRow(i, { value: e.target.value })}
+                    />
+                    <button
+                      className="x"
+                      aria-label="Remove"
+                      onClick={() =>
+                        setPay(pay.length > 1 ? pay.filter((_, k) => k !== i) : [{ label: "", value: "" }])
+                      }
+                    >
+                      ×
+                    </button>
+                  </div>
+                  {payHalf(p) && (
+                    <div className="warn" style={{ marginTop: 4 }}>
+                      {p.value.trim()
+                        ? "Type which app this is for, so people know where to send it."
+                        : "Add the link, username or phone for this app, or remove the row."}
+                    </div>
+                  )}
                 </div>
               ))}
               {pay.length < MAX_PAY && (
@@ -345,8 +363,8 @@ function NewBill() {
                 </button>
               )}
               <div className="hint">
-                Whatever that app needs. Links open when tapped; anything else gets a copy button.
-                Everyone sees them once the split is final.
+                Type the app&apos;s name, then whatever it needs to find you. Links open when tapped;
+                anything else gets a copy button. Everyone sees them once the split is final.
               </div>
             </div>
 
@@ -360,9 +378,11 @@ function NewBill() {
                 ? "Creating…"
                 : ready
                 ? "Looks right — make the code"
-                : totalCents > 0
+                : !name.trim() || totalCents <= 0
+                ? "Add your name and the total"
+                : totalTooLow
                 ? "Fix the total first"
-                : "Add your name and the total"}
+                : "Finish the payment details first"}
             </button>
           </>
         )}
@@ -518,7 +538,7 @@ function BillView({ code }) {
   if (!me)
     return (
       <Shell>
-        <h1>{bill.merchant || "Split the bill"}</h1>
+        <h1>{bill.merchant || "Split the tacos"}</h1>
         <p className="sub">
           {bill.payer_name ? bill.payer_name + " covered this one. " : ""}
           {fmt(s.grand)} total. Put your name in and tap what you had.
@@ -566,7 +586,7 @@ function BillView({ code }) {
 
   return (
     <Shell>
-      <h1>{bill.merchant || "Split the bill"}</h1>
+      <h1>{bill.merchant || "Split the tacos"}</h1>
       <p className="sub">
         You&apos;re {me.name}. Tap everything you had — everyone else&apos;s screen updates as you go.
       </p>
@@ -826,7 +846,7 @@ function PayMethods({ bill, payer }) {
         const href = asLink(m.value);
         return (
           <div className="payway" key={i}>
-            <div className="pwl">{m.label || "Pay"}</div>
+            {m.label && <div className="pwl">{m.label}</div>}
             {href ? (
               <a className="pwv" href={href} target="_blank" rel="noopener noreferrer">{m.value}</a>
             ) : (
@@ -877,7 +897,7 @@ function PayUp({ bill, s, me, patchDiner, reopen }) {
   const payer = bill.payer_name || "the payer";
   return (
     <Shell>
-      <h1>{bill.merchant || "Split the bill"}</h1>
+      <h1>{bill.merchant || "Split the tacos"}</h1>
       <p className="sub">
         Everyone&apos;s confirmed, so the numbers are final. Here&apos;s what you owe {payer}.
       </p>
@@ -941,7 +961,7 @@ function Paid({ bill, s, me }) {
 
       <div className="receipt">
         <div className="rhead">
-          <div className="rmerch">{bill.merchant || "Split the bill"}</div>
+          <div className="rmerch">{bill.merchant || "Split the tacos"}</div>
           <div className="rdate">{billDate(bill)}</div>
         </div>
         <div className="rwho">
@@ -979,7 +999,7 @@ function Collecting({ bill, diners, s, me, settled, isCollector, patchDiner, reo
 
   return (
     <Shell>
-      <h1>{bill.merchant || "Split the bill"}</h1>
+      <h1>{bill.merchant || "Split the tacos"}</h1>
       <p className="sub">
         Everyone&apos;s confirmed. Tick people off as their money lands — once it&apos;s all in,
         this turns into the receipt.
@@ -1068,7 +1088,7 @@ function Collected({ bill, diners, s, me, isCollector, openLedger }) {
 
       <div className="receipt">
         <div className="rhead">
-          <div className="rmerch">{bill.merchant || "Split the bill"}</div>
+          <div className="rmerch">{bill.merchant || "Split the tacos"}</div>
           <div className="rdate">{billDate(bill)}</div>
         </div>
         <div className="rwho">Paid by {payer}, split by what everyone had</div>
