@@ -80,6 +80,8 @@ export async function POST(req) {
         // same trust model as claiming items.
         collector_device: body.collector_device || null,
       };
+      // The name on the payer's accounts, for apps that ask for one.
+      row.pay_name = String(body.pay_name || "").trim().slice(0, 80);
       // Three label/value pairs, stored as typed. Empty strings for unused slots.
       const pay = Array.isArray(body.pay) ? body.pay : [];
       for (let n = 1; n <= 3; n++) {
