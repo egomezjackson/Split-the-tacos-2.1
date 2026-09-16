@@ -6,7 +6,7 @@ import QRCode from "qrcode";
 import {
   supabase, deviceId, savedName, saveName, billCode, shrink,
   fmt, toCents, computeShares, PALETTE, initials,
-  MAX_PAY, payMethods, asLink, savedPay, savePay,
+  MAX_PAY, payMethods, payName, asLink, savedPay, savePay, savedPayName, savePayName,
 } from "./lib";
 
 /**
@@ -43,6 +43,7 @@ function NewBill() {
   const [fee, setFee] = useState("");
   const [total, setTotal] = useState(""); // handwritten. typed, never scanned.
   // How people pay you back. Remembered from last time, one blank row if none.
+  const [payerName, setPayerName] = useState(savedPayName);
   const [pay, setPay] = useState(() => {
     const p = savedPay().filter((x) => x.label || x.value);
     return p.length ? p : [{ label: "", value: "" }];
@@ -118,6 +119,7 @@ function NewBill() {
       .filter((p) => p.value)
       .slice(0, MAX_PAY);
     savePay(methods);
+    savePayName(payerName.trim());
     const code = billCode();
     const r = await fetch("/api/go", {
       method: "POST",
@@ -128,6 +130,7 @@ function NewBill() {
         merchant,
         payer_name: name.trim(),
         collector_device: deviceId(),
+        pay_name: payerName.trim(),
         pay: methods,
         total_cents: totalCents,
         tax_cents: toCents(tax),
@@ -192,10 +195,12 @@ function NewBill() {
         ) : (
           <>
             {/* ---- the one number they read off the paper ---- */}
-            <div className="sechead">
+            <div className="sechead" style={{ marginBottom: 8 }}>
               <h2>What was the total?</h2>
-              <span>Including tip, taxes and card fees</span>
             </div>
+            <p className="lede">
+              The whole amount charged to your card — tip, taxes and card fees included.
+            </p>
 
             <div className="totalbox">
               <span className="sign">$</span>
@@ -310,6 +315,19 @@ function NewBill() {
               <div className="sechead">
                 <h2>How people pay you back</h2>
                 <span>Optional, up to {MAX_PAY}</span>
+              </div>
+
+              <div className="fld" style={{ marginBottom: 12 }}>
+                <label>Your full name</label>
+                <input
+                  value={payerName}
+                  aria-label="Your full name"
+                  onChange={(e) => setPayerName(e.target.value)}
+                />
+                <div className="hint" style={{ marginTop: 4 }}>
+                  Shown with every method below. Some apps, Zelle especially, won&apos;t send
+                  without the name on the account.
+                </div>
               </div>
 
               {/* Headings, not placeholders: grey example text in the box read as
@@ -635,6 +653,14 @@ function BillView({ code }) {
         <i style={{ width: `${items.length ? ((items.length - s.unclaimedCount) / items.length) * 100 : 0}%` }} />
       </div>
 
+      {!locked && !me.done && (
+        <div className={"tapnote" + (mine.lines.length === 0 ? " loud" : "")}>
+          {mine.lines.length === 0
+            ? "Tap each thing you had to add it to your total. Tap it again to undo."
+            : "Tap anything else you had, or tap again to undo."}
+        </div>
+      )}
+
       {items.map((it) => {
         const on = s.claimersOf[it.id] || [];
         const isMine = on.includes(me.id);
@@ -695,15 +721,17 @@ function BillView({ code }) {
           </>
         ) : (
           <>
-            <button
-              className="btn"
-              style={{ width: "100%" }}
-              onClick={() => setDone(true)}
-            >
-              That&apos;s everything I had — {fmt(mine.total)}
+            <button className="btn tall" onClick={() => setDone(true)}>
+              <span className="lead">
+                {mine.total > 0 ? `Submit ${fmt(mine.total)}` : "Submit"}
+              </span>
+              <span className="under">
+                {mine.total > 0 ? "That's everything I had" : "Nothing here was mine"}
+              </span>
             </button>
             <div className="hint">
-              Locks your picks so a stray tap can&apos;t change them.
+              Locks your picks so a stray tap can&apos;t change them. You can still change your
+              mind afterwards.
               {confirmedCount > 0 && ` ${confirmedCount} of ${diners.length} confirmed so far.`}
             </div>
           </>
@@ -722,7 +750,7 @@ function BillView({ code }) {
               <span style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--ink)" }}>
                 <span className="chip" style={{ background: d.color }}>{initials(d.name)}</span>
                 {d.name}
-                {d.done && <span className="tick">\u2713</span>}
+                {d.done && <span className="tick">{"\u2713"}</span>}
               </span>
               <b className="num">{fmt(s.byId[d.id]?.total ?? 0)}</b>
             </div>
@@ -834,6 +862,7 @@ function Tick({ checked, disabled, onChange, children }) {
 
 function PayMethods({ bill, payer }) {
   const methods = payMethods(bill);
+  const name = payName(bill);
   if (methods.length === 0)
     return (
       <div className="flag amber">
@@ -842,6 +871,13 @@ function PayMethods({ bill, payer }) {
     );
   return (
     <div className="ledger">
+      {name && (
+        <div className="payway">
+          <div className="pwl">Name</div>
+          <div className="pwv sel">{name}</div>
+          <CopyButton text={name} />
+        </div>
+      )}
       {methods.map((m, i) => {
         const href = asLink(m.value);
         return (
