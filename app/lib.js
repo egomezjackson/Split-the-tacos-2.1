@@ -183,6 +183,10 @@ export const initials = (name = "") =>
 // needs (a link, a phone number, a username). No per-app logic on purpose.
 export const MAX_PAY = 3;
 
+// The name on the payer's account. Some apps — Zelle especially — won't let
+// you send without it, and it's often not the name they go by at the table.
+export const payName = (bill) => (bill?.pay_name || "").trim();
+
 export function payMethods(bill) {
   const out = [];
   for (let n = 1; n <= MAX_PAY; n++) {
@@ -221,3 +225,7 @@ export function savedPay() {
   }
 }
 export const savePay = (list) => localStorage.setItem("split.pay", JSON.stringify(list));
+
+export const savedPayName = () =>
+  typeof window === "undefined" ? "" : localStorage.getItem("split.payname") || "";
+export const savePayName = (n) => localStorage.setItem("split.payname", n);
