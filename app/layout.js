@@ -151,6 +151,20 @@ a.pwv{color:var(--marine);font-weight:600;text-underline-offset:2px;}
 .pwv.sel{-webkit-user-select:all;user-select:all;}
 .payhead{display:flex;gap:7px;font-size:12px;color:var(--ink2);font-weight:500;margin-bottom:4px;}
 
+/* the sentence under a heading that has to actually be read */
+.lede{font-size:14px;color:var(--ink2);line-height:1.5;margin:0 0 10px;}
+
+/* tapping the rows is the whole interaction, so say so */
+.tapnote{font-size:13px;color:var(--ink2);line-height:1.5;margin:0 0 12px;}
+.tapnote.loud{background:#FBF3E2;border:1.5px solid #E6CE95;color:#6B4C0A;
+  border-radius:9px;padding:11px 13px;font-weight:600;}
+
+/* the one button everyone at the table has to find */
+.btn.tall{width:100%;padding:16px 16px 14px;border-radius:12px;display:block;}
+.btn.tall .lead{display:block;font-size:20px;font-weight:800;letter-spacing:-0.02em;
+  font-variant-numeric:tabular-nums;line-height:1.15;}
+.btn.tall .under{display:block;font-size:13px;font-weight:500;opacity:.72;margin-top:3px;}
+
 /* the global input rule makes everything full width; checkboxes opt out */
 input[type=checkbox]{width:20px;height:20px;flex:0 0 20px;margin:0;padding:0;
   accent-color:var(--marine);cursor:pointer;}
