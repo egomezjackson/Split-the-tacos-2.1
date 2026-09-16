@@ -176,7 +176,9 @@ input[type=checkbox]:disabled{cursor:default;}
 .tickbox.off{cursor:default;opacity:.6;}
 .tickbox:has(input:focus-visible){outline:2.5px solid var(--marine);outline-offset:2px;}
 .sentbox{margin-top:22px;}
-.sentbox .tickbox{display:flex;padding:14px;font-size:15px;}
+.sentbox .tickbox{display:flex;align-items:center;gap:13px;padding:19px 16px;
+  font-size:17px;border-radius:12px;border-width:2px;}
+.sentbox input[type=checkbox]{width:27px;height:27px;flex:0 0 27px;}
 
 .payrow{background:var(--card);border:1.5px solid var(--stone);border-radius:11px;
   padding:11px 13px;margin-bottom:7px;}
