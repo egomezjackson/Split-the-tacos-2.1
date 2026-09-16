@@ -417,7 +417,11 @@ function BillView({ code }) {
   const [me, setMe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
+  // Prefilled from last time, but held in state so it's a normal editable box.
+  // It used to fall back to the saved name whenever the field was empty, so
+  // deleting the last letter put the old name straight back.
   const [joinName, setJoinName] = useState("");
+  useEffect(() => { setJoinName(savedName()); }, []);
   const [showShare, setShowShare] = useState(false);
   // The payer can go back to the ledger after it's complete, in case they
   // ticked someone by mistake.
@@ -563,12 +567,14 @@ function BillView({ code }) {
         </p>
         <div style={{ display: "flex", gap: 7 }}>
           <input
-            value={joinName || savedName()}
+            value={joinName}
             placeholder="Your name"
             onChange={(e) => setJoinName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && join(joinName || savedName())}
+            onKeyDown={(e) => e.key === "Enter" && join(joinName)}
           />
-          <button className="btn" onClick={() => join(joinName || savedName())}>Join</button>
+          <button className="btn" disabled={!joinName.trim()} onClick={() => join(joinName)}>
+            Join
+          </button>
         </div>
       </Shell>
     );
