@@ -16,15 +16,48 @@ const admin = createClient(
 
 const PROMPT =
   "Read this receipt. Return ONLY a JSON object — no markdown fences, no commentary:\n" +
-  '{"merchant":string,"items":[{"n":string,"p":number}],"subtotal":number,"tax":number,"fee":number}\n' +
+  '{"merchant":string,"items":[{"n":string,"p":number}],"subtotal":number,"tax":number,' +
+  '"fee":number,"written_total":number|null,"written_tip":number|null}\n' +
   "Rules:\n" +
-  "- Read ONLY machine-printed text. Ignore anything handwritten.\n" +
-  "- Do NOT read the tip or the final total, even if you can see them. They are written by hand.\n" +
+  "- items, subtotal, tax and fee come from machine-printed text ONLY.\n" +
   "- If a line has quantity 2 or more, emit that many separate entries so each can be claimed individually.\n" +
   '- "p" is the price of ONE unit.\n' +
   '- "subtotal" is the printed subtotal before tax. 0 if not printed.\n' +
   '- "fee" is any printed credit card surcharge or service charge. 0 if none.\n' +
+  '- "written_total" is the final total handwritten at the bottom; "written_tip" the\n' +
+  "  handwritten tip. These two are the ONLY handwriting you read.\n" +
+  "- Return null for either one unless every digit is unmistakable. Null if a digit is\n" +
+  "  inferred or ambiguous (a 1 that could be a 7, a 3 that could be an 8), if it is\n" +
+  "  crossed out, overwritten, faint, partly out of frame, or if a decimal point is\n" +
+  "  unclear. Null if the field is blank or you cannot find it.\n" +
+  "- NEVER calculate either number from the others, and never guess. A null costs\n" +
+  "  nothing; a wrong digit changes what every person at the table pays.\n" +
   "- Numbers, not strings. No currency symbols.";
+
+const cents = (v) => (Number.isFinite(Number(v)) ? Math.round(Number(v) * 100) : 0);
+
+// What the handwriting is allowed to claim. The card total is ground truth for
+// every share, so a misread here is silent and expensive — these checks throw
+// away anything that can't be corroborated by the printed lines.
+function readTotal(d) {
+  const printed =
+    (d.items || []).reduce((a, it) => a + cents(it.p), 0) + cents(d.tax) + cents(d.fee);
+  if (printed <= 0) return null;
+
+  const total = d.written_total == null ? null : cents(d.written_total);
+  const tip = d.written_tip == null ? null : cents(d.written_tip);
+  const sane = (t) => t >= printed && t - printed <= Math.round(printed * 0.5);
+
+  // Both read: they have to agree, or one of them is wrong and we don't know which.
+  if (total != null && tip != null) {
+    if (Math.abs(printed + tip - total) > 2) return null;
+    return sane(total) ? total : null;
+  }
+  if (total != null) return sane(total) ? total : null;
+  // Only the tip is legible, so the total is arithmetic rather than reading.
+  if (tip != null && tip >= 0 && tip <= Math.round(printed * 0.5)) return printed + tip;
+  return null;
+}
 
 export async function POST(req) {
   const body = await req.json();
@@ -59,7 +92,13 @@ export async function POST(req) {
       if (!data.content) return Response.json({ error: "vision failed" }, { status: 502 });
       const text = data.content.map((b) => (b.type === "text" ? b.text : "")).join("")
         .replace(/```json|```/g, "").trim();
-      return Response.json(JSON.parse(text));
+      const d = JSON.parse(text);
+      // Offered as a starting point for the payer to check, never as a fact.
+      // Blank when it isn't certain: they type it themselves, as before.
+      const total = readTotal(d);
+      delete d.written_total;
+      delete d.written_tip;
+      return Response.json({ ...d, total: total == null ? null : total / 100 });
     } catch {
       return Response.json({ error: "could not read that image" }, { status: 500 });
     }
