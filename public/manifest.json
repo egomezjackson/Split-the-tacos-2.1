@@ -1,0 +1,22 @@
+{
+  "name": "Split the tacos",
+  "short_name": "Split tacos",
+  "description": "Everyone pays for what they ate, tax and tip included.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#EFF0EA",
+  "theme_color": "#15232B",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
