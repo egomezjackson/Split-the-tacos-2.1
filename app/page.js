@@ -21,6 +21,14 @@ import {
  * received. The payer's own phone gets the ledger instead.
  */
 export default function Page() {
+  // Registers the service worker. It caches nothing that matters — it exists so
+  // Chrome will offer "install", and so the app opens when there's no signal.
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+  }, []);
+
   return (
     <Suspense fallback={<div className="page" />}>
       <Router />
@@ -71,8 +79,15 @@ function NewBill() {
       setPrintedSubtotal(toCents(d.subtotal));
       setTax(String(d.tax ?? 0));
       setFee(String(d.fee ?? 0));
+      // The scan fills the total in only when it could read the handwriting
+      // beyond doubt. Otherwise it stays blank and the payer types it, and
+      // either way the tip underneath is their check that it's right.
+      setTotal(d.total ? d.total.toFixed(2) : "");
       // Straight to the one number they have to read off the paper.
-      setTimeout(() => totalBox.current?.focus(), 200);
+      setTimeout(() => {
+        totalBox.current?.focus();
+        totalBox.current?.select?.();
+      }, 200);
     } catch {
       setError("Couldn't read that one. Try a brighter, straighter photo — or type the lines in.");
       setItems([{ name: "", price: "" }]);
@@ -153,6 +168,11 @@ function NewBill() {
   return (
     <div className="page">
       <div className="wrap">
+        {/* Only on the empty start screen. Once a receipt is in, the space
+            belongs to the form. */}
+        {items.length === 0 && (
+          <img className="hero" src="/hero.webp" alt="Friends splitting a taco" width="640" height="640" />
+        )}
         <h1>Split the tacos</h1>
         <p className="sub">
           Photograph the receipt, share the code, everyone taps what they had. Tax and tip
@@ -172,8 +192,8 @@ function NewBill() {
               {reading ? "Reading the receipt…" : "Photograph the receipt"}
             </div>
             <p>
-              Get the item lines and the tax in frame. You&apos;ll type the total yourself —
-              handwriting is the one thing a scan can&apos;t be trusted with.
+              Get the item lines, the tax and the total you wrote in frame. You&apos;ll check
+              everything before anyone sees it.
             </p>
             <input
               ref={photo}
@@ -852,6 +872,83 @@ const billDate = (bill) =>
     ? new Date(bill.created_at).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })
     : "";
 
+// Android fires beforeinstallprompt when it's willing to install the app, and
+// the event is the only way to open that prompt later. iOS has no equivalent:
+// there, the button can only explain where Add to Home Screen lives.
+function useInstall() {
+  const [prompt, setPrompt] = useState(null);
+  const [installed, setInstalled] = useState(false);
+  useEffect(() => {
+    if (window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone) {
+      setInstalled(true);
+    }
+    const keep = (e) => { e.preventDefault(); setPrompt(e); };
+    const done = () => { setInstalled(true); setPrompt(null); };
+    window.addEventListener("beforeinstallprompt", keep);
+    window.addEventListener("appinstalled", done);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", keep);
+      window.removeEventListener("appinstalled", done);
+    };
+  }, []);
+  return { prompt, setPrompt, installed };
+}
+
+function ShareRow() {
+  const { prompt, setPrompt, installed } = useInstall();
+  const [note, setNote] = useState("");
+  const [how, setHow] = useState("");
+
+  const share = async () => {
+    const url = window.location.origin;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "Split the tacos",
+          text: "Split a restaurant bill by what everyone actually ate. No accounts, just tap what you had.",
+          url,
+        });
+        return;
+      } catch {
+        return; // they closed the share sheet
+      }
+    }
+    setNote((await copyText(url)) ? "Link copied. Paste it anywhere." : url);
+    setTimeout(() => setNote(""), 5000);
+  };
+
+  const install = async () => {
+    if (prompt) {
+      prompt.prompt();
+      await prompt.userChoice.catch(() => {});
+      setPrompt(null);
+      return;
+    }
+    const ios =
+      /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    setHow(
+      ios
+        ? "Tap the share button at the bottom of Safari, scroll down the list, then tap Add to Home Screen."
+        : "Open your browser's menu, then choose Install app or Add to home screen."
+    );
+  };
+
+  return (
+    <div className="tell noprint">
+      <div className="tellq">Liked Split the tacos?</div>
+      <div className="tellrow">
+        <button className="btn" onClick={share}>Share it with friends</button>
+        {!installed && (
+          <button className="btn ghost" onClick={install}>Add to home screen</button>
+        )}
+      </div>
+      {note && <div className="hint">{note}</div>}
+      {how && <div className="flag marine" style={{ margin: "10px 0 0" }}>{how}</div>}
+    </div>
+  );
+}
+
 function Tick({ checked, disabled, onChange, children }) {
   return (
     <label className={"tickbox" + (checked ? " on" : "") + (disabled ? " off" : "")}>
@@ -1001,6 +1098,8 @@ function Paid({ bill, s, me }) {
         </p>
       </div>
 
+      <ShareRow />
+
       <div className="receipt">
         <div className="rhead">
           <div className="rmerch">{bill.merchant || "Split the tacos"}</div>
@@ -1127,6 +1226,8 @@ function Collected({ bill, diners, s, me, isCollector, openLedger }) {
           bill is below for your records.
         </p>
       </div>
+
+      <ShareRow />
 
       <div className="receipt">
         <div className="rhead">
