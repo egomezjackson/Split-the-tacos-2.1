@@ -1,6 +1,19 @@
 export const metadata = {
   title: "Split the tacos",
   description: "Everyone pays for what they ate, tax and tip included.",
+  manifest: "/manifest.json",
+  icons: { icon: "/favicon.png", apple: "/apple-icon.png" },
+  // The picture WhatsApp, Messages and the rest show when someone shares the
+  // link. Those apps need a full address, and Vercel supplies the site's own.
+  metadataBase: process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? new URL(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`)
+    : undefined,
+  openGraph: {
+    title: "Split the tacos",
+    description: "Everyone pays for what they ate, tax and tip included.",
+    images: [{ url: "/og.jpg", width: 1200, height: 1200, alt: "Friends splitting a taco" }],
+  },
+  appleWebApp: { capable: true, title: "Split tacos", statusBarStyle: "default" },
 };
 
 export const viewport = { width: "device-width", initialScale: 1, themeColor: "#15232B" };
@@ -179,6 +192,16 @@ input[type=checkbox]:disabled{cursor:default;}
 .sentbox .tickbox{display:flex;align-items:center;gap:13px;padding:19px 16px;
   font-size:17px;border-radius:12px;border-width:2px;}
 .sentbox input[type=checkbox]{width:27px;height:27px;flex:0 0 27px;}
+
+/* the ask at the top of a receipt — the one moment someone's pleased */
+.tell{background:var(--card);border:1.5px solid var(--stone);border-radius:11px;
+  padding:14px;margin-bottom:16px;}
+.tellq{font-size:15px;font-weight:700;margin-bottom:10px;}
+.tellrow{display:flex;flex-direction:column;gap:8px;}
+.tellrow .btn{width:100%;}
+
+/* the illustration, on the empty start screen */
+.hero{display:block;width:min(210px,58%);height:auto;margin:0 0 18px;}
 
 .payrow{background:var(--card);border:1.5px solid var(--stone);border-radius:11px;
   padding:11px 13px;margin-bottom:7px;}
