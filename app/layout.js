@@ -63,8 +63,10 @@ input:focus{border-color:var(--marine);outline:none;}
 .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;}
 
 .drop{border:2px dashed var(--stone);border-radius:14px;background:var(--card);
-  padding:34px 22px;text-align:center;}
-.drop p{margin:12px 0 18px;color:var(--ink2);font-size:14px;line-height:1.55;}
+  padding:30px 20px 24px;text-align:center;}
+.dropt{font-size:16px;font-weight:700;letter-spacing:-0.01em;margin-bottom:18px;}
+.dropb{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin-bottom:14px;}
+.dropb .btn{flex:1 1 140px;max-width:230px;}
 
 .row{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center;
   background:var(--card);border:1.5px solid var(--stone);border-radius:11px;
