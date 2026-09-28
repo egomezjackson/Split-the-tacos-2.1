@@ -60,6 +60,7 @@ function NewBill() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const photo = useRef(null);
+  const pick = useRef(null);
   const totalBox = useRef(null);
 
   const scan = async (file) => {
@@ -188,9 +189,11 @@ function NewBill() {
 
         {items.length === 0 ? (
           <div className="drop">
-            <div className="num" style={{ fontSize: 15 }}>
+            <div className="dropt">
               {reading ? "Reading the receipt…" : "Photograph the receipt"}
             </div>
+            {/* Two inputs, because `capture` forces the camera. Without it the
+                phone offers the photo library and files instead. */}
             <input
               ref={photo}
               type="file"
@@ -199,14 +202,24 @@ function NewBill() {
               style={{ display: "none" }}
               onChange={(e) => e.target.files[0] && scan(e.target.files[0])}
             />
-            <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+            <input
+              ref={pick}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => e.target.files[0] && scan(e.target.files[0])}
+            />
+            <div className="dropb">
               <button className="btn" disabled={reading} onClick={() => photo.current.click()}>
                 {reading ? "Reading…" : "Take a photo"}
               </button>
-              <button className="btn ghost" onClick={() => setItems([{ name: "", price: "" }])}>
-                Type it in
+              <button className="btn ghost" disabled={reading} onClick={() => pick.current.click()}>
+                Upload
               </button>
             </div>
+            <button className="mini" onClick={() => setItems([{ name: "", price: "" }])}>
+              or type it in
+            </button>
           </div>
         ) : (
           <>
@@ -638,16 +651,12 @@ function BillView({ code }) {
 
       {showShare && (
         <div className="share" style={{ marginBottom: 20 }}>
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>Everyone scan this</div>
-          <div className="hint" style={{ marginTop: 0, marginBottom: 12 }}>
-            Phone camera, not the app. It opens straight to this bill.
-          </div>
+          <div style={{ fontWeight: 700, marginBottom: 12 }}>Everyone scan this</div>
           <canvas ref={drawQr} />
-          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 14 }}>
+          <div style={{ marginTop: 14 }}>
             <button className="btn ghost sm" onClick={() => navigator.clipboard?.writeText(url)}>
               Copy the link
             </button>
-            <button className="btn ghost sm" onClick={() => setShowShare(false)}>Hide</button>
           </div>
         </div>
       )}
@@ -674,7 +683,9 @@ function BillView({ code }) {
             ? "Everything's claimed"
             : `${s.unclaimedCount} left to claim`}
         </h2>
-        {!showShare && <button className="mini" onClick={() => setShowShare(true)}>show the code</button>}
+        <button className="mini" onClick={() => setShowShare(!showShare)}>
+          {showShare ? "hide the code" : "show the code"}
+        </button>
       </div>
       <div className="prog">
         <i style={{ width: `${items.length ? ((items.length - s.unclaimedCount) / items.length) * 100 : 0}%` }} />
