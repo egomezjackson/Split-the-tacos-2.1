@@ -17,16 +17,23 @@ const admin = createClient(
 const PROMPT =
   "Read this receipt. Return ONLY a JSON object — no markdown fences, no commentary:\n" +
   '{"merchant":string,"items":[{"n":string,"p":number}],"subtotal":number,"tax":number,' +
-  '"fee":number,"printed_total":number|null,"tip_line":"none"|"blank"|"written",' +
+  '"fee":number,"gratuity":number,"printed_total":number|null,' +
+  '"tip_line":"none"|"blank"|"written",' +
   '"written_total":number|null,"written_tip":number|null}\n' +
   "Rules:\n" +
-  "- items, subtotal, tax, fee and printed_total come from machine-printed text ONLY.\n" +
+  "- items, subtotal, tax, fee, gratuity and printed_total come from machine-printed\n" +
+  "  text ONLY.\n" +
   "- If a line has quantity 2 or more, emit that many separate entries so each can be claimed individually.\n" +
   '- "p" is the price of ONE unit.\n' +
   '- "subtotal" is the printed subtotal before tax. 0 if not printed.\n' +
-  '- "fee" is any printed credit card surcharge or service charge. 0 if none.\n' +
+  '- "fee" is a printed CARD surcharge only — a percentage for paying by card.\n' +
+  "  0 if none. A gratuity or service charge is NOT a fee.\n" +
+  '- "gratuity" is a printed tip already added to the bill: auto gratuity,\n' +
+  "  service charge, large-party gratuity, propina. 0 if none. This is money the\n" +
+  "  server receives, so it must never go in fee or tax.\n" +
   '- "printed_total" is the printed TOTAL or AMOUNT line — the final printed\n' +
-  "  figure, including any printed tip or service charge. null if not printed.\n" +
+  "  figure, including any printed gratuity. null if not printed. Ignore any\n" +
+  "  suggested-tip table (\"+18% Total ...\"): those are options, not the total.\n" +
   '- "tip_line" describes the tip on paper: "none" if the receipt has no tip line\n' +
   '  at all, "blank" if there is a tip line with nothing written on it, "written"\n' +
   "  if anything at all has been written on it, legible or not.\n" +
@@ -47,7 +54,8 @@ const cents = (v) => (Number.isFinite(Number(v)) ? Math.round(Number(v) * 100) :
 // can't corroborate is thrown away and the payer types it instead.
 function readTotal(d) {
   const lines =
-    (d.items || []).reduce((a, it) => a + cents(it.p), 0) + cents(d.tax) + cents(d.fee);
+    (d.items || []).reduce((a, it) => a + cents(it.p), 0) +
+    cents(d.tax) + cents(d.fee) + cents(d.gratuity);
   if (lines <= 0) return null;
 
   // Not less than what's printed, and not a tip over half the bill — that's
@@ -112,6 +120,7 @@ export async function POST(req) {
       // Blank when it isn't certain: they type it themselves, as before.
       const total = readTotal(d);
       for (const k of ["printed_total", "tip_line", "written_total", "written_tip"]) delete d[k];
+      d.gratuity = Number(d.gratuity) || 0;
       return Response.json({ ...d, total: total == null ? null : total / 100 });
     } catch {
       return Response.json({ error: "could not read that image" }, { status: 500 });
