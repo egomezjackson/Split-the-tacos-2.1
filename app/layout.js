@@ -61,6 +61,7 @@ input{font:inherit;font-size:14px;border:1.5px solid var(--stone);background:var
 input:focus{border-color:var(--marine);outline:none;}
 .fld label{display:block;font-size:12px;color:var(--ink2);margin-bottom:4px;font-weight:500;}
 .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
 
 .drop{border:2px dashed var(--stone);border-radius:14px;background:var(--card);
   padding:30px 20px 24px;text-align:center;}
