@@ -17,45 +17,60 @@ const admin = createClient(
 const PROMPT =
   "Read this receipt. Return ONLY a JSON object — no markdown fences, no commentary:\n" +
   '{"merchant":string,"items":[{"n":string,"p":number}],"subtotal":number,"tax":number,' +
-  '"fee":number,"written_total":number|null,"written_tip":number|null}\n' +
+  '"fee":number,"printed_total":number|null,"tip_line":"none"|"blank"|"written",' +
+  '"written_total":number|null,"written_tip":number|null}\n' +
   "Rules:\n" +
-  "- items, subtotal, tax and fee come from machine-printed text ONLY.\n" +
+  "- items, subtotal, tax, fee and printed_total come from machine-printed text ONLY.\n" +
   "- If a line has quantity 2 or more, emit that many separate entries so each can be claimed individually.\n" +
   '- "p" is the price of ONE unit.\n' +
   '- "subtotal" is the printed subtotal before tax. 0 if not printed.\n' +
   '- "fee" is any printed credit card surcharge or service charge. 0 if none.\n' +
-  '- "written_total" is the final total handwritten at the bottom; "written_tip" the\n' +
-  "  handwritten tip. These two are the ONLY handwriting you read.\n" +
+  '- "printed_total" is the printed TOTAL or AMOUNT line — the final printed\n' +
+  "  figure, including any printed tip or service charge. null if not printed.\n" +
+  '- "tip_line" describes the tip on paper: "none" if the receipt has no tip line\n' +
+  '  at all, "blank" if there is a tip line with nothing written on it, "written"\n' +
+  "  if anything at all has been written on it, legible or not.\n" +
+  '- "written_total" is the final total handwritten at the bottom; "written_tip"\n' +
+  "  the handwritten tip. These two are the ONLY handwriting you read as numbers.\n" +
   "- Return null for either one unless every digit is unmistakable. Null if a digit is\n" +
   "  inferred or ambiguous (a 1 that could be a 7, a 3 that could be an 8), if it is\n" +
   "  crossed out, overwritten, faint, partly out of frame, or if a decimal point is\n" +
   "  unclear. Null if the field is blank or you cannot find it.\n" +
-  "- NEVER calculate either number from the others, and never guess. A null costs\n" +
+  "- NEVER calculate any of these from the others, and never guess. A null costs\n" +
   "  nothing; a wrong digit changes what every person at the table pays.\n" +
   "- Numbers, not strings. No currency symbols.";
 
 const cents = (v) => (Number.isFinite(Number(v)) ? Math.round(Number(v) * 100) : 0);
 
-// What the handwriting is allowed to claim. The card total is ground truth for
-// every share, so a misread here is silent and expensive — these checks throw
-// away anything that can't be corroborated by the printed lines.
+// What may be filled into the total box. Every share is worked out from this
+// number, so a misread is silent and expensive: anything the printed lines
+// can't corroborate is thrown away and the payer types it instead.
 function readTotal(d) {
-  const printed =
+  const lines =
     (d.items || []).reduce((a, it) => a + cents(it.p), 0) + cents(d.tax) + cents(d.fee);
-  if (printed <= 0) return null;
+  if (lines <= 0) return null;
 
+  // Not less than what's printed, and not a tip over half the bill — that's
+  // what a misread digit looks like.
+  const sane = (t) => t != null && t >= lines - 2 && t - lines <= Math.round(lines * 0.5);
+
+  const printed = d.printed_total == null ? null : cents(d.printed_total);
   const total = d.written_total == null ? null : cents(d.written_total);
   const tip = d.written_tip == null ? null : cents(d.written_tip);
-  const sane = (t) => t >= printed && t - printed <= Math.round(printed * 0.5);
+  const base = sane(printed) ? printed : lines;
 
-  // Both read: they have to agree, or one of them is wrong and we don't know which.
+  // Handwriting wins where it's legible: it was written after the printing.
   if (total != null && tip != null) {
-    if (Math.abs(printed + tip - total) > 2) return null;
+    // Two readings that disagree mean one is wrong, with no way to tell which.
+    if (Math.abs(base + tip - total) > 2) return null;
     return sane(total) ? total : null;
   }
   if (total != null) return sane(total) ? total : null;
-  // Only the tip is legible, so the total is arithmetic rather than reading.
-  if (tip != null && tip >= 0 && tip <= Math.round(printed * 0.5)) return printed + tip;
+  if (tip != null && tip >= 0) return sane(base + tip) ? base + tip : null;
+
+  // Nothing handwritten to read. A receipt with no tip line, or an untouched
+  // one, is already the final charge.
+  if (d.tip_line !== "written" && sane(printed)) return printed;
   return null;
 }
 
@@ -96,8 +111,7 @@ export async function POST(req) {
       // Offered as a starting point for the payer to check, never as a fact.
       // Blank when it isn't certain: they type it themselves, as before.
       const total = readTotal(d);
-      delete d.written_total;
-      delete d.written_tip;
+      for (const k of ["printed_total", "tip_line", "written_total", "written_tip"]) delete d[k];
       return Response.json({ ...d, total: total == null ? null : total / 100 });
     } catch {
       return Response.json({ error: "could not read that image" }, { status: 500 });
