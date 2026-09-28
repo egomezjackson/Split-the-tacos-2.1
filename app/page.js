@@ -191,10 +191,6 @@ function NewBill() {
             <div className="num" style={{ fontSize: 15 }}>
               {reading ? "Reading the receipt…" : "Photograph the receipt"}
             </div>
-            <p>
-              Get the item lines, the tax and the total you wrote in frame. You&apos;ll check
-              everything before anyone sees it.
-            </p>
             <input
               ref={photo}
               type="file"
@@ -216,11 +212,9 @@ function NewBill() {
           <>
             {/* ---- the one number they read off the paper ---- */}
             <div className="sechead" style={{ marginBottom: 8 }}>
-              <h2>What was the total?</h2>
+              <h2>{total.trim() ? "Is this the total?" : "What was the total?"}</h2>
+              <span>Tip, taxes and fees included</span>
             </div>
-            <p className="lede">
-              The whole amount charged to your card — tip, taxes and card fees included.
-            </p>
 
             <div className="totalbox">
               <span className="sign">$</span>
@@ -234,7 +228,21 @@ function NewBill() {
               />
             </div>
 
-            {totalCents > 0 && !totalTooLow && (
+            {!total.trim() && printed > 0 && (
+              <button
+                className="btn ghost sm"
+                style={{ marginTop: 10 }}
+                onClick={() => setTotal((printed / 100).toFixed(2))}
+              >
+                Use the printed total, {fmt(printed)}
+              </button>
+            )}
+
+            {totalCents > 0 && !totalTooLow && tipCents === 0 && (
+              <div className="hint">No tip counted. Add it to the total if you wrote one.</div>
+            )}
+
+            {totalCents > 0 && !totalTooLow && tipCents > 0 && (
               <div className="tipcard">
                 <div className="tipamt">
                   <span>Tip</span>
@@ -269,7 +277,6 @@ function NewBill() {
             <div className="sec">
               <div className="sechead">
                 <h2>{merchant || "The printed lines"}</h2>
-                <span>Fix anything the scan got wrong</span>
               </div>
 
               <div className="fld" style={{ marginBottom: 10 }}>
@@ -334,7 +341,7 @@ function NewBill() {
             <div className="sec">
               <div className="sechead">
                 <h2>How people pay you back</h2>
-                <span>Optional, up to {MAX_PAY}</span>
+                <span>Optional</span>
               </div>
 
               <div className="fld" style={{ marginBottom: 12 }}>
@@ -344,10 +351,7 @@ function NewBill() {
                   aria-label="Your full name"
                   onChange={(e) => setPayerName(e.target.value)}
                 />
-                <div className="hint" style={{ marginTop: 4 }}>
-                  Shown with every method below. Some apps, Zelle especially, won&apos;t send
-                  without the name on the account.
-                </div>
+                <div className="hint" style={{ marginTop: 4 }}>Zelle and others ask for it.</div>
               </div>
 
               {/* Headings, not placeholders: grey example text in the box read as
@@ -400,10 +404,7 @@ function NewBill() {
                   Add another
                 </button>
               )}
-              <div className="hint">
-                Type the app&apos;s name, then whatever it needs to find you. Links open when tapped;
-                anything else gets a copy button. Everyone sees them once the split is final.
-              </div>
+
             </div>
 
             <button
@@ -679,11 +680,9 @@ function BillView({ code }) {
         <i style={{ width: `${items.length ? ((items.length - s.unclaimedCount) / items.length) * 100 : 0}%` }} />
       </div>
 
-      {!locked && !me.done && (
-        <div className={"tapnote" + (mine.lines.length === 0 ? " loud" : "")}>
-          {mine.lines.length === 0
-            ? "Tap each thing you had to add it to your total. Tap it again to undo."
-            : "Tap anything else you had, or tap again to undo."}
+      {!locked && !me.done && mine.lines.length === 0 && (
+        <div className="tapnote loud">
+          Tap each thing you had to add it to your total. Tap it again to undo.
         </div>
       )}
 
@@ -755,11 +754,9 @@ function BillView({ code }) {
                 {mine.total > 0 ? "That's everything I had" : "Nothing here was mine"}
               </span>
             </button>
-            <div className="hint">
-              Locks your picks so a stray tap can&apos;t change them. You can still change your
-              mind afterwards.
-              {confirmedCount > 0 && ` ${confirmedCount} of ${diners.length} confirmed so far.`}
-            </div>
+            {confirmedCount > 0 && (
+              <div className="hint">{confirmedCount} of {diners.length} confirmed</div>
+            )}
           </>
         )}
       </div>
@@ -792,10 +789,7 @@ function BillView({ code }) {
             <span className="num">{fmt(s.grand)}</span>
           </div>
         </div>
-        <div className="hint">
-          Everyone&apos;s share adds up to the charge exactly — no rounding left on{" "}
-          {bill.payer_name || "whoever paid"}.
-        </div>
+
       </div>
 
       <div className="bar">
@@ -1037,9 +1031,6 @@ function PayUp({ bill, s, me, patchDiner, reopen }) {
   return (
     <Shell>
       <h1>{bill.merchant || "Split the tacos"}</h1>
-      <p className="sub">
-        Everyone&apos;s confirmed, so the numbers are final. Here&apos;s what you owe {payer}.
-      </p>
 
       <div className="tot done">
         <div className="totline">
@@ -1061,11 +1052,7 @@ function PayUp({ bill, s, me, patchDiner, reopen }) {
         <Tick checked={me.sent} onChange={(v) => patchDiner(me.id, { sent: v })}>
           I&apos;ve sent {fmt(mine.total)}
         </Tick>
-        <div className="hint">
-          {me.sent
-            ? `Now ${payer} just has to see it arrive. This page turns into your receipt when they tick it off.`
-            : `Tick this once the money's gone, so ${payer} knows to look for it.`}
-        </div>
+        {me.sent && <div className="hint">Waiting for {payer} to confirm it arrived.</div>}
       </div>
 
       <div className="sec">
@@ -1120,9 +1107,6 @@ function Paid({ bill, s, me }) {
         >
           Download receipt
         </button>
-        <div className="hint" style={{ textAlign: "center" }}>
-          Opens the print screen. Choose Save as PDF.
-        </div>
       </div>
     </Shell>
   );
@@ -1141,10 +1125,7 @@ function Collecting({ bill, diners, s, me, settled, isCollector, patchDiner, reo
   return (
     <Shell>
       <h1>{bill.merchant || "Split the tacos"}</h1>
-      <p className="sub">
-        Everyone&apos;s confirmed. Tick people off as their money lands — once it&apos;s all in,
-        this turns into the receipt.
-      </p>
+      <p className="sub">Tick people off as their money lands.</p>
 
       <div className={"tot" + (allIn ? " done" : "")}>
         <div className="hint" style={{ marginTop: 0 }}>Still to come in</div>
@@ -1270,7 +1251,6 @@ function Collected({ bill, diners, s, me, isCollector, openLedger }) {
           Download receipt
         </button>
         <div className="hint" style={{ textAlign: "center" }}>
-          Opens the print screen. Choose Save as PDF.{" "}
           <button className="mini" onClick={openLedger}>Ticked someone by mistake?</button>
         </div>
       </div>
