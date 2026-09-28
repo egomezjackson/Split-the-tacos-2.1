@@ -164,9 +164,6 @@ a.pwv{color:var(--marine);font-weight:600;text-underline-offset:2px;}
 .pwv.sel{-webkit-user-select:all;user-select:all;}
 .payhead{display:flex;gap:7px;font-size:12px;color:var(--ink2);font-weight:500;margin-bottom:4px;}
 
-/* the sentence under a heading that has to actually be read */
-.lede{font-size:14px;color:var(--ink2);line-height:1.5;margin:0 0 10px;}
-
 /* tapping the rows is the whole interaction, so say so */
 .tapnote{font-size:13px;color:var(--ink2);line-height:1.5;margin:0 0 12px;}
 .tapnote.loud{background:#FBF3E2;border:1.5px solid #E6CE95;color:#6B4C0A;
