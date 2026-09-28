@@ -50,6 +50,7 @@ function NewBill() {
   const [tax, setTax] = useState("");
   const [fee, setFee] = useState("");
   const [total, setTotal] = useState(""); // handwritten. typed, never scanned.
+  const [grat, setGrat] = useState("");   // service charge or auto gratuity, printed
   // How people pay you back. Remembered from last time, one blank row if none.
   const [payerName, setPayerName] = useState(savedPayName);
   const [pay, setPay] = useState(() => {
@@ -80,6 +81,7 @@ function NewBill() {
       setPrintedSubtotal(toCents(d.subtotal));
       setTax(String(d.tax ?? 0));
       setFee(String(d.fee ?? 0));
+      setGrat(String(d.gratuity ?? 0));
       // The scan fills the total in only when it could read the handwriting
       // beyond doubt. Otherwise it stays blank and the payer types it, and
       // either way the tip underneath is their check that it's right.
@@ -102,22 +104,25 @@ function NewBill() {
     setPay(pay.map((p, k) => (k === i ? { ...p, ...patch } : p)));
 
   const itemsSum = items.reduce((a, it) => a + toCents(it.price), 0);
-  const printed = itemsSum + toCents(tax) + toCents(fee);
+  const gratCents = toCents(grat);
+  const printed = itemsSum + toCents(tax) + toCents(fee) + gratCents;
   const totalCents = toCents(total);
 
-  // The tip is whatever they wrote, minus everything the machine printed.
-  // One number to type instead of two, and it can't disagree with itself.
-  const tipCents = totalCents > 0 ? totalCents - printed : 0;
+  // Anything above the printed lines was added by hand, on top of whatever
+  // gratuity the restaurant already printed. Both are tip.
+  const addedCents = totalCents > 0 ? totalCents - printed : 0;
+  const tipCents = totalCents > 0 ? gratCents + addedCents : 0;
 
   // Two percentages, because "I left 18%" means different things depending
   // on whether you counted the tax. Showing both settles it.
+  const beforeTip = printed - gratCents;
   const pctFood = itemsSum > 0 ? (tipCents / itemsSum) * 100 : 0;
-  const pctBill = printed > 0 ? (tipCents / printed) * 100 : 0;
+  const pctBill = beforeTip > 0 ? (tipCents / beforeTip) * 100 : 0;
   const pct = (n) => (n >= 10 ? Math.round(n) : Math.round(n * 10) / 10);
 
   const missedLine = printedSubtotal > 0 && Math.abs(printedSubtotal - itemsSum) > 2;
-  const totalTooLow = totalCents > 0 && tipCents < 0;
-  const tipOdd = totalCents > 0 && tipCents >= 0 && (pctFood > 40 || (pctFood < 5 && tipCents > 0));
+  const totalTooLow = totalCents > 0 && addedCents < 0;
+  const tipOdd = totalCents > 0 && addedCents >= 0 && (pctFood > 40 || (pctFood < 5 && tipCents > 0));
 
   // A payment row needs both halves: which app, and where to send it. Half a
   // row is what made guests see a phone number with no idea which app it's for.
@@ -151,7 +156,7 @@ function NewBill() {
         total_cents: totalCents,
         tax_cents: toCents(tax),
         fee_cents: toCents(fee),
-        tip_cents: Math.max(0, tipCents),
+        tip_cents: Math.max(0, tipCents),   // printed gratuity plus anything added
         items: items
           .filter((it) => it.name || toCents(it.price))
           .map((it) => ({ name: it.name, price_cents: toCents(it.price) })),
@@ -258,7 +263,16 @@ function NewBill() {
             {totalCents > 0 && !totalTooLow && tipCents > 0 && (
               <div className="tipcard">
                 <div className="tipamt">
-                  <span>Tip</span>
+                  <span>
+                    Tip
+                    {gratCents > 0 && (
+                      <span className="of">
+                        {addedCents > 0
+                          ? ` ${fmt(gratCents)} on the bill + ${fmt(addedCents)} added`
+                          : " already on the bill"}
+                      </span>
+                    )}
+                  </span>
                   <b className="num">{fmt(tipCents)}</b>
                 </div>
                 <div className="tippcts">
@@ -326,10 +340,14 @@ function NewBill() {
                 Add a line
               </button>
 
-              <div className="grid2" style={{ marginTop: 14 }}>
+              <div className="grid3" style={{ marginTop: 14 }}>
                 <div className="fld">
                   <label>Tax</label>
                   <input value={tax} inputMode="decimal" onChange={(e) => setTax(e.target.value)} />
+                </div>
+                <div className="fld">
+                  <label>Gratuity</label>
+                  <input value={grat} inputMode="decimal" onChange={(e) => setGrat(e.target.value)} />
                 </div>
                 <div className="fld">
                   <label>Card fee</label>
