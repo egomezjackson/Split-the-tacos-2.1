@@ -66,7 +66,7 @@ input:focus{border-color:var(--marine);outline:none;}
    this row's right edge level with the item prices, which sit inside a row
    that ends with a remove button */
 .grid2 input,.grid3 input{text-align:right;}
-.grid3.inline{padding-right:24px;}
+.grid2.inline,.grid3.inline{padding-right:24px;}
 
 .drop{border:2px dashed var(--stone);border-radius:14px;background:var(--card);
   padding:30px 20px 24px;text-align:center;}
