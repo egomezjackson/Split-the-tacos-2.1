@@ -59,9 +59,14 @@ h2{font-size:13px;font-weight:700;margin:0;}
 input{font:inherit;font-size:14px;border:1.5px solid var(--stone);background:var(--card);
   border-radius:8px;padding:9px 11px;color:var(--ink);width:100%;}
 input:focus{border-color:var(--marine);outline:none;}
-.fld label{display:block;font-size:12px;color:var(--ink2);margin-bottom:4px;font-weight:500;}
-.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;}
-.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
+.fld label{display:block;font-size:12px;color:var(--ink2);margin-bottom:6px;font-weight:600;}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+/* amounts line up on the right, like the prices above them. the padding keeps
+   this row's right edge level with the item prices, which sit inside a row
+   that ends with a remove button */
+.grid2 input,.grid3 input{text-align:right;}
+.grid3.inline{padding-right:24px;}
 
 .drop{border:2px dashed var(--stone);border-radius:14px;background:var(--card);
   padding:30px 20px 24px;text-align:center;}
@@ -165,7 +170,7 @@ input:focus{border-color:var(--marine);outline:none;}
 .pwv{flex:1;min-width:0;overflow-wrap:anywhere;}
 a.pwv{color:var(--marine);font-weight:600;text-underline-offset:2px;}
 .pwv.sel{-webkit-user-select:all;user-select:all;}
-.payhead{display:flex;gap:7px;font-size:12px;color:var(--ink2);font-weight:500;margin-bottom:4px;}
+.payhead{display:flex;gap:7px;font-size:12px;color:var(--ink2);font-weight:600;margin-bottom:6px;}
 
 /* tapping the rows is the whole interaction, so say so */
 .tapnote{font-size:13px;color:var(--ink2);line-height:1.5;margin:0 0 12px;}
