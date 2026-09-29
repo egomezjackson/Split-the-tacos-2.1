@@ -50,7 +50,9 @@ function NewBill() {
   const [tax, setTax] = useState("");
   const [fee, setFee] = useState("");
   const [total, setTotal] = useState(""); // handwritten. typed, never scanned.
-  const [grat, setGrat] = useState("");   // service charge or auto gratuity, printed
+  // Only receipts that print a gratuity get a gratuity box. Everywhere else
+  // it would be one more thing to read and leave at zero.
+  const [grat, setGrat] = useState("");
   // How people pay you back. Remembered from last time, one blank row if none.
   const [payerName, setPayerName] = useState(savedPayName);
   const [pay, setPay] = useState(() => {
@@ -81,7 +83,7 @@ function NewBill() {
       setPrintedSubtotal(toCents(d.subtotal));
       setTax(String(d.tax ?? 0));
       setFee(String(d.fee ?? 0));
-      setGrat(String(d.gratuity ?? 0));
+      setGrat(Number(d.gratuity) > 0 ? String(d.gratuity) : "");
       // The scan fills the total in only when it could read the handwriting
       // beyond doubt. Otherwise it stays blank and the payer types it, and
       // either way the tip underneath is their check that it's right.
@@ -105,6 +107,7 @@ function NewBill() {
 
   const itemsSum = items.reduce((a, it) => a + toCents(it.price), 0);
   const gratCents = toCents(grat);
+  const hasGrat = grat !== "";
   const printed = itemsSum + toCents(tax) + toCents(fee) + gratCents;
   const totalCents = toCents(total);
 
@@ -264,14 +267,11 @@ function NewBill() {
               <div className="tipcard">
                 <div className="tipamt">
                   <span>
-                    Tip
-                    {gratCents > 0 && (
-                      <span className="of">
-                        {addedCents > 0
-                          ? ` ${fmt(gratCents)} on the bill + ${fmt(addedCents)} added`
-                          : " already on the bill"}
-                      </span>
-                    )}
+                    {gratCents > 0
+                      ? addedCents > 0
+                        ? `Gratuity ${fmt(gratCents)} + tip ${fmt(addedCents)}`
+                        : "Gratuity"
+                      : "Tip"}
                   </span>
                   <b className="num">{fmt(tipCents)}</b>
                 </div>
@@ -340,15 +340,17 @@ function NewBill() {
                 Add a line
               </button>
 
-              <div className="grid3 inline" style={{ marginTop: 18 }}>
+              <div className={(hasGrat ? "grid3" : "grid2") + " inline"} style={{ marginTop: 18 }}>
                 <div className="fld">
                   <label>Tax</label>
                   <input value={tax} inputMode="decimal" onChange={(e) => setTax(e.target.value)} />
                 </div>
-                <div className="fld">
-                  <label>Gratuity</label>
-                  <input value={grat} inputMode="decimal" onChange={(e) => setGrat(e.target.value)} />
-                </div>
+                {hasGrat && (
+                  <div className="fld">
+                    <label>Gratuity</label>
+                    <input value={grat} inputMode="decimal" onChange={(e) => setGrat(e.target.value)} />
+                  </div>
+                )}
                 <div className="fld">
                   <label>Card fee</label>
                   <input value={fee} inputMode="decimal" onChange={(e) => setFee(e.target.value)} />
