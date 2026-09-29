@@ -230,7 +230,7 @@ function NewBill() {
           <>
             {/* ---- the one number they read off the paper ---- */}
             <div className="sechead" style={{ marginBottom: 8 }}>
-              <h2>{total.trim() ? "Is this the total?" : "What was the total?"}</h2>
+              <h2>{total.trim() ? "Verify the total" : "Enter the total"}</h2>
               <span>Tip, taxes and fees included</span>
             </div>
 
@@ -340,7 +340,7 @@ function NewBill() {
                 Add a line
               </button>
 
-              <div className="grid3" style={{ marginTop: 14 }}>
+              <div className="grid3 inline" style={{ marginTop: 18 }}>
                 <div className="fld">
                   <label>Tax</label>
                   <input value={tax} inputMode="decimal" onChange={(e) => setTax(e.target.value)} />
