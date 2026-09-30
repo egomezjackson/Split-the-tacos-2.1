@@ -86,9 +86,20 @@ input:focus{border-color:var(--marine);outline:none;}
 .chip{display:inline-flex;align-items:center;justify-content:center;width:23px;height:23px;
   border-radius:50%;color:#fff;font-size:10px;font-weight:700;flex:0 0 23px;}
 .each{font-size:11.5px;color:var(--ink2);}
+.cnt{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;color:var(--ink2);font-weight:600;}
+.row.many{cursor:default;}
+.stepper{display:flex;align-items:center;gap:9px;margin-left:auto;}
+.stepb{width:36px;height:36px;border-radius:10px;border:1.5px solid var(--stone);
+  background:var(--card);font:inherit;font-size:20px;font-weight:700;line-height:1;
+  color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.stepb:hover{border-color:var(--ink2);}
+.stepb:disabled{opacity:.3;cursor:default;}
+.stepper b{min-width:18px;text-align:center;font-size:17px;}
 .warn{font-size:11.5px;color:var(--amber);font-weight:600;}
 .mini{background:none;border:none;font:inherit;font-size:11.5px;color:var(--ink2);
   text-decoration:underline;cursor:pointer;padding:0;}
+.foot2{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  flex-wrap:wrap;margin-top:22px;}
 
 .pplrow{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px;}
 .ptab{display:flex;align-items:center;gap:7px;border:1.5px solid var(--stone);background:var(--card);
@@ -152,16 +163,14 @@ input:focus{border-color:var(--marine);outline:none;}
 .derived{font-size:13px;color:var(--ink2);margin-top:9px;}
 .derived b{color:var(--ink);}
 
-.tipcard{background:var(--card);border:1.5px solid var(--stone);border-top:none;
-  border-radius:0 0 12px 12px;margin:0 10px;padding:11px 14px;
-  display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;}
-.tipamt{display:flex;align-items:baseline;gap:8px;}
-.tipamt span{font-size:12px;color:var(--ink2);font-weight:500;}
-.tipamt b{font-size:19px;}
-.tippcts{display:flex;gap:18px;}
-.tippcts div{text-align:right;}
-.tippcts b{font-size:15px;display:block;line-height:1.2;}
-.tippcts span{font-size:10.5px;color:var(--ink2);display:block;}
+/* the bottom of the receipt: printed lines, the tip you can type either way,
+   and the total the two of them make */
+.totals{margin-top:14px;padding-top:12px;border-top:1.5px solid var(--stone);}
+.tiprow{align-items:center;padding:6px 0;}
+.tipin{width:104px;text-align:right;font-weight:700;color:var(--marine);
+  border-color:#A8C9C2;padding:7px 10px;}
+.tipin:focus{border-color:var(--marine);}
+.pcts{font-size:11.5px;color:var(--ink2);text-align:right;margin-top:2px;}
 
 /* ---- version 2: paying the payer back ---- */
 .payway{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:14px;}
