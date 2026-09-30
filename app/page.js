@@ -48,6 +48,10 @@ function NewBill() {
   const [items, setItems] = useState([]);
   const [printedSubtotal, setPrintedSubtotal] = useState(0); // cross-check only
   const [tax, setTax] = useState("");
+  // Held only while they're typing in the tip box, so the number doesn't
+  // reformat itself under the cursor. Null the rest of the time, when the
+  // box simply shows the total minus everything printed.
+  const [tipRaw, setTipRaw] = useState(null);
   const [fee, setFee] = useState("");
   const [total, setTotal] = useState(""); // handwritten. typed, never scanned.
   // Only receipts that print a gratuity get a gratuity box. Everywhere else
@@ -259,37 +263,9 @@ function NewBill() {
               </button>
             )}
 
-            {totalCents > 0 && !totalTooLow && tipCents === 0 && (
-              <div className="hint">No tip counted. Add it to the total if you wrote one.</div>
-            )}
-
-            {totalCents > 0 && !totalTooLow && tipCents > 0 && (
-              <div className="tipcard">
-                <div className="tipamt">
-                  <span>
-                    {gratCents > 0
-                      ? addedCents > 0
-                        ? `Gratuity ${fmt(gratCents)} + tip ${fmt(addedCents)}`
-                        : "Gratuity"
-                      : "Tip"}
-                  </span>
-                  <b className="num">{fmt(tipCents)}</b>
-                </div>
-                <div className="tippcts">
-                  <div>
-                    <b className="num">{pct(pctFood)}%</b>
-                    <span>on the food</span>
-                  </div>
-                  <div>
-                    <b className="num">{pct(pctBill)}%</b>
-                    <span>on the whole bill</span>
-                  </div>
-                </div>
-              </div>
-            )}
             {totalTooLow && (
               <div className="flag rose" style={{ marginTop: 10 }}>
-                That&apos;s {fmt(-tipCents)} less than the printed lines come to. Check for a
+                That&apos;s {fmt(-addedCents)} less than the printed lines come to. Check for a
                 typo, or fix a price below.
               </div>
             )}
@@ -364,9 +340,38 @@ function NewBill() {
                 </div>
               )}
 
-              <div className="lline" style={{ marginTop: 10 }}>
-                <span>Printed lines come to</span>
-                <b className="num">{fmt(printed)}</b>
+              {/* Tip and total, each worked out from the other. Type a total
+                  and the tip is what's left over; type a tip and it's added on. */}
+              <div className="totals">
+                <div className="lline">
+                  <span>Printed lines come to</span>
+                  <b className="num">{fmt(printed)}</b>
+                </div>
+                <div className="lline tiprow">
+                  <span>{gratCents > 0 ? "Extra tip" : "Tip"}</span>
+                  <input
+                    className="tipin"
+                    value={tipRaw !== null ? tipRaw : totalCents > 0 ? (addedCents / 100).toFixed(2) : ""}
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    aria-label="Tip"
+                    onChange={(e) => {
+                      setTipRaw(e.target.value);
+                      setTotal(((printed + toCents(e.target.value)) / 100).toFixed(2));
+                    }}
+                    onBlur={() => setTipRaw(null)}
+                  />
+                </div>
+                {tipCents > 0 && !totalTooLow && (
+                  <div className="pcts">
+                    {gratCents > 0 && `with gratuity, ${fmt(tipCents)} — `}
+                    {pct(pctFood)}% on the food · {pct(pctBill)}% on the whole bill
+                  </div>
+                )}
+                <div className="lline big">
+                  <span>Total</span>
+                  <span className="num">{fmt(Math.max(0, totalCents))}</span>
+                </div>
               </div>
             </div>
 
@@ -456,6 +461,17 @@ function NewBill() {
                 ? "Fix the total first"
                 : "Finish the payment details first"}
             </button>
+
+            <div className="hint" style={{ textAlign: "center" }}>
+              <button
+                className="mini"
+                onClick={() => {
+                  if (window.confirm("Start over? This receipt's lines will be cleared.")) startOver();
+                }}
+              >
+                Start over
+              </button>
+            </div>
           </>
         )}
       </div>
@@ -578,19 +594,23 @@ function BillView({ code }) {
     load();
   };
 
-  const toggle = async (itemId) => {
-    // Once you've confirmed, your taps stop registering. That's the point —
-    // a stray thumb while the phone is going round the table shouldn't
-    // quietly change what someone owes.
+  // Once you've confirmed, your taps stop registering. That's the point —
+  // a stray thumb while the phone is going round the table shouldn't
+  // quietly change what someone owes.
+  const setClaim = async (itemId, on) => {
     if (!me || me.done) return;
-    const mine = claims.some((c) => c.item_id === itemId && c.diner_id === me.id);
     // Optimistic, so tapping feels instant on restaurant wifi.
-    setClaims((cs) =>
-      mine ? cs.filter((c) => !(c.item_id === itemId && c.diner_id === me.id))
-           : [...cs, { item_id: itemId, diner_id: me.id }]
-    );
-    if (mine) await supabase.from("claims").delete().eq("item_id", itemId).eq("diner_id", me.id);
-    else await supabase.from("claims").insert({ item_id: itemId, diner_id: me.id });
+    setClaims((cs) => {
+      const without = cs.filter((c) => !(c.item_id === itemId && c.diner_id === me.id));
+      return on ? [...without, { item_id: itemId, diner_id: me.id }] : without;
+    });
+    if (on) await supabase.from("claims").insert({ item_id: itemId, diner_id: me.id });
+    else await supabase.from("claims").delete().eq("item_id", itemId).eq("diner_id", me.id);
+  };
+
+  const toggle = (itemId) => {
+    if (!me || me.done) return;
+    setClaim(itemId, !claims.some((c) => c.item_id === itemId && c.diner_id === me.id));
   };
 
   if (loading) return <Shell><p className="sub">Loading…</p></Shell>;
@@ -714,38 +734,53 @@ function BillView({ code }) {
       {!locked && !me.done && mine.lines.length === 0 && (
         <div className="tapnote loud">
           Tap each thing you had to add it to your total. Tap it again to undo.
+          {items.length > 0 && groupItems(items).some((g) => g.items.length >= GROUP_AT) &&
+            " Where there are several of the same thing, use + and −."}
         </div>
       )}
 
-      {items.map((it) => {
-        const on = s.claimersOf[it.id] || [];
-        const isMine = on.includes(me.id);
-        return (
-          <button
-            key={it.id}
-            className={
-              "row" + (isMine ? " mine" : "") + (on.length === 0 && !locked ? " open" : "") +
-              (me.done ? " frozen" : "")
-            }
-            onClick={() => toggle(it.id)}
-            disabled={me.done}
-          >
-            <span className="nm">{it.name || "Untitled item"}</span>
-            <span className="pr num">{fmt(it.price_cents)}</span>
-            <span className="foot">
-              {on.map((id) => {
-                const d = diners.find((x) => x.id === id);
-                return d ? <span key={id} className="chip" style={{ background: d.color }}>{initials(d.name)}</span> : null;
-              })}
-              {on.length === 0 ? (
-                <span className="warn">Nobody yet</span>
-              ) : on.length > 1 ? (
-                <span className="each">{fmt(Math.round(it.price_cents / on.length))} each, {on.length} ways</span>
-              ) : null}
-            </span>
-          </button>
-        );
-      })}
+      {groupItems(items).map((g) =>
+        g.items.length >= GROUP_AT ? (
+          <ManyRow key={g.key} g={g} s={s} diners={diners} me={me} locked={locked} setClaim={setClaim} />
+        ) : (
+          g.items.map((it) => {
+            const on = s.claimersOf[it.id] || [];
+            const isMine = on.includes(me.id);
+            return (
+              <button
+                key={it.id}
+                className={
+                  "row" + (isMine ? " mine" : "") + (on.length === 0 && !locked ? " open" : "") +
+                  (me.done ? " frozen" : "")
+                }
+                onClick={() => toggle(it.id)}
+                disabled={me.done}
+              >
+                <span className="nm">{it.name || "Untitled item"}</span>
+                <span className="pr num">{fmt(it.price_cents)}</span>
+                <span className="foot">
+                  {on.map((id) => {
+                    const d = diners.find((x) => x.id === id);
+                    return d ? (
+                      <span key={id} className="chip" style={{ background: d.color }}>
+                        {initials(d.name)}
+                      </span>
+                    ) : null;
+                  })}
+                  {on.length === 0 ? (
+                    <span className="warn">Nobody yet</span>
+                  ) : on.length > 1 ? (
+                    <span className="each">
+                      {fmt(Math.round(it.price_cents / on.length))} each, {on.length} ways
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+            );
+          })
+        )
+      )}
+
 
       {s.unclaimed !== 0 && (
         <div className="flag amber" style={{ marginTop: 12 }}>
@@ -821,6 +856,9 @@ function BillView({ code }) {
           </div>
         </div>
 
+        <div className="hint" style={{ textAlign: "center", marginTop: 18 }}>
+          <NewBill2 />
+        </div>
       </div>
 
       <div className="bar">
@@ -840,6 +878,110 @@ function BillView({ code }) {
         </div>
       </div>
     </Shell>
+  );
+}
+
+// Twenty-six identical tacos as twenty-six rows is how people end up all
+// tapping the same one. Three or more of the same thing at the same price
+// become a single row with a counter.
+const GROUP_AT = 3;
+
+function groupItems(items) {
+  const out = [];
+  const by = new Map();
+  for (const it of items) {
+    const key = `${(it.name || "").trim().toLowerCase()}|${it.price_cents}`;
+    let g = by.get(key);
+    if (!g) {
+      g = { key, name: it.name, price: it.price_cents, items: [] };
+      by.set(key, g);
+      out.push(g);
+    }
+    g.items.push(it);
+  }
+  return out;
+}
+
+function ManyRow({ g, s, diners, me, locked, setClaim }) {
+  const on = (it) => s.claimersOf[it.id] || [];
+  const mine = g.items.filter((it) => on(it).includes(me.id));
+  const free = g.items.filter((it) => on(it).length === 0).length;
+
+  const counts = [];
+  g.items.forEach((it) =>
+    on(it).forEach((id) => {
+      const row = counts.find((c) => c.id === id);
+      if (row) row.n += 1;
+      else counts.push({ id, n: 1 });
+    })
+  );
+
+  // Take an untouched one first, so two people tapping at once don't land on
+  // the same taco and end up splitting it.
+  const add = () => {
+    const pool = g.items.filter((it) => !on(it).includes(me.id));
+    if (!pool.length) return;
+    setClaim([...pool].sort((a, b) => on(a).length - on(b).length)[0].id, true);
+  };
+  // Give up a shared one before one that's yours alone.
+  const drop = () => {
+    if (!mine.length) return;
+    setClaim([...mine].sort((a, b) => on(b).length - on(a).length)[0].id, false);
+  };
+
+  return (
+    <div
+      className={
+        "row many" + (mine.length ? " mine" : "") + (free > 0 && !locked ? " open" : "") +
+        (me.done ? " frozen" : "")
+      }
+    >
+      <span className="nm">{g.name || "Untitled item"}</span>
+      <span className="pr num">{fmt(g.price)} each</span>
+      <span className="foot">
+        <span className="each">
+          {g.items.length} on the bill{free > 0 && `, ${free} unclaimed`}
+        </span>
+        {counts.map(({ id, n }) => {
+          const d = diners.find((x) => x.id === id);
+          return d ? (
+            <span key={id} className="cnt">
+              <span className="chip" style={{ background: d.color }}>{initials(d.name)}</span>
+              {n > 1 && <span>×{n}</span>}
+            </span>
+          ) : null;
+        })}
+        <span className="stepper">
+          <button className="stepb" aria-label="One fewer" disabled={me.done || !mine.length} onClick={drop}>
+            −
+          </button>
+          <b className="num">{mine.length}</b>
+          <button
+            className="stepb"
+            aria-label="One more"
+            disabled={me.done || mine.length === g.items.length}
+            onClick={add}
+          >
+            +
+          </button>
+        </span>
+      </span>
+    </div>
+  );
+}
+
+// Added to a home screen, the app has no address bar and no back button, so
+// finishing a bill leaves you stuck on it until you swipe the app away. A full
+// reload, not a route change, so nothing from the last bill is left behind.
+const startOver = () => { window.location.href = "/"; };
+
+function NewBill2({ big, label = "Start a new bill" }) {
+  return big ? (
+    <button className="btn ghost" style={{ width: "100%", marginTop: 10 }} onClick={startOver}>
+      {label}
+    </button>
+  ) : (
+    <button className="mini" onClick={startOver}>{label}</button>
   );
 }
 
@@ -1026,6 +1168,25 @@ function PayMethods({ bill, payer }) {
   );
 }
 
+// Eight of the same taco is one line saying ×8, not eight lines. Split the
+// same item different ways and each way keeps its own line.
+function groupLines(lines) {
+  const out = [];
+  const by = new Map();
+  for (const { item, cents, ways } of lines) {
+    const key = `${(item.name || "").trim().toLowerCase()}|${item.price_cents}|${ways}`;
+    let r = by.get(key);
+    if (!r) {
+      r = { key, name: item.name, price: item.price_cents, ways, cents: 0, n: 0 };
+      by.set(key, r);
+      out.push(r);
+    }
+    r.cents += cents;
+    r.n += 1;
+  }
+  return out;
+}
+
 // One person's items, their share of the extras, and the total. The line
 // cents come from computeShares itself, so they add up to the total exactly.
 function Lines({ share }) {
@@ -1034,13 +1195,14 @@ function Lines({ share }) {
       {share.lines.length === 0 && (
         <div className="lline"><span>Nothing claimed</span><b className="num">{fmt(0)}</b></div>
       )}
-      {share.lines.map(({ item, cents, ways }) => (
-        <div className="lline" key={item.id}>
+      {groupLines(share.lines).map((r) => (
+        <div className="lline" key={r.key}>
           <span>
-            {item.name || "Untitled item"}
-            {ways > 1 && <span className="of"> — {ways}-way share of {fmt(item.price_cents)}</span>}
+            {r.name || "Untitled item"}
+            {r.n > 1 && ` ×${r.n}`}
+            {r.ways > 1 && <span className="of"> — {r.ways}-way share of {fmt(r.price)}</span>}
           </span>
-          <b className="num">{fmt(cents)}</b>
+          <b className="num">{fmt(r.cents)}</b>
         </div>
       ))}
       <div className="lline rule">
@@ -1094,8 +1256,9 @@ function PayUp({ bill, s, me, patchDiner, reopen }) {
         <div className="ledger"><Lines share={mine} /></div>
       </div>
 
-      <div className="hint" style={{ marginTop: 22 }}>
+      <div className="foot2">
         <button className="mini" onClick={reopen}>Something&apos;s wrong with the split? Reopen it</button>
+        <NewBill2 />
       </div>
     </Shell>
   );
@@ -1138,6 +1301,7 @@ function Paid({ bill, s, me }) {
         >
           Download receipt
         </button>
+        <NewBill2 big />
       </div>
     </Shell>
   );
@@ -1214,8 +1378,9 @@ function Collecting({ bill, diners, s, me, settled, isCollector, patchDiner, reo
           All in — show the receipt
         </button>
       ) : (
-        <div className="hint" style={{ marginTop: 22 }}>
+        <div className="foot2">
           <button className="mini" onClick={reopen}>Something&apos;s wrong with the split? Reopen it</button>
+          <NewBill2 />
         </div>
       )}
     </Shell>
@@ -1281,6 +1446,7 @@ function Collected({ bill, diners, s, me, isCollector, openLedger }) {
         >
           Download receipt
         </button>
+        <NewBill2 big />
         <div className="hint" style={{ textAlign: "center" }}>
           <button className="mini" onClick={openLedger}>Ticked someone by mistake?</button>
         </div>
