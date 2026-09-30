@@ -626,6 +626,7 @@ function BillView({ code }) {
   const s = computeShares({ items, diners, claims, bill });
   const allClaimed = s.unclaimedCount === 0 && diners.length > 0;
   const confirmedCount = diners.filter((d) => d.done).length;
+  const waitingOn = diners.filter((d) => !d.done);
   // Locked once everyone has said they're finished AND nothing is unclaimed.
   // Someone joining later un-locks it automatically, since they aren't done.
   const locked = allClaimed && diners.length > 0 && confirmedCount === diners.length;
@@ -717,7 +718,7 @@ function BillView({ code }) {
         <h2>
           {locked
             ? "Locked"
-            : me.done
+            : me.done && waitingOn.length > 0
             ? "Waiting on the others"
             : allClaimed
             ? "Everything's claimed"
@@ -802,8 +803,11 @@ function BillView({ code }) {
           <>
             <div className="hint" style={{ marginTop: 0, marginBottom: 8 }}>
               You&apos;re done. {confirmedCount} of {diners.length} confirmed
-              {diners.filter((d) => !d.done).length <= 3 && (
-                <> · waiting on {diners.filter((d) => !d.done).map((d) => d.name).join(", ")}</>
+              {waitingOn.length > 0 && waitingOn.length <= 3 && (
+                <> · waiting on {waitingOn.map((d) => d.name).join(", ")}</>
+              )}
+              {waitingOn.length === 0 && !allClaimed && (
+                <> · {s.unclaimedCount} {s.unclaimedCount === 1 ? "item" : "items"} nobody claimed</>
               )}
             </div>
             <button className="btn ghost" style={{ width: "100%" }} onClick={() => setDone(false)}>
