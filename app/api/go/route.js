@@ -17,7 +17,7 @@ const admin = createClient(
 const PROMPT =
   "Read this receipt. Return ONLY a JSON object — no markdown fences, no commentary:\n" +
   '{"merchant":string,"items":[{"n":string,"p":number}],"subtotal":number,"tax":number,' +
-  '"fee":number,"gratuity":number,"printed_total":number|null,' +
+  '"fee":number,"tax_included":boolean,"gratuity":number,"printed_total":number|null,' +
   '"tip_line":"none"|"blank"|"written",' +
   '"written_total":number|null,"written_tip":number|null}\n' +
   "Rules:\n" +
@@ -26,6 +26,11 @@ const PROMPT =
   "- If a line has quantity 2 or more, emit that many separate entries so each can be claimed individually.\n" +
   '- "p" is the price of ONE unit.\n' +
   '- "subtotal" is the printed subtotal before tax. 0 if not printed.\n' +
+  '- "tax_included" is true when the tax is ALREADY inside the item prices and\n' +
+  "  the line at the bottom only breaks it out — normal in Mexico, where menu\n" +
+  '  prices include IVA ("IVA incluido", "IVA desglosado", a total that equals\n' +
+  "  the items on their own). False when the tax is added on top of the items to\n" +
+  "  reach the total, as in the United States.\n" +
   '- "fee" is a printed CARD surcharge only — a percentage for paying by card.\n' +
   "  0 if none. A gratuity or service charge is NOT a fee.\n" +
   '- "gratuity" is a printed tip already added to the bill: auto gratuity,\n' +
@@ -52,10 +57,27 @@ const cents = (v) => (Number.isFinite(Number(v)) ? Math.round(Number(v) * 100) :
 // What may be filled into the total box. Every share is worked out from this
 // number, so a misread is silent and expensive: anything the printed lines
 // can't corroborate is thrown away and the payer types it instead.
-function readTotal(d) {
+// Is the tax already inside the item prices? Mexican receipts print IVA at the
+// bottom as a breakdown of prices that already contain it; American ones add it
+// on. Adding a Mexican one charges the table for its tax twice. The printed
+// total settles it by arithmetic; the model's reading is the fallback.
+function taxIsIncluded(d) {
+  const items = (d.items || []).reduce((a, it) => a + cents(it.p), 0);
+  const tax = cents(d.tax);
+  const rest = cents(d.fee) + cents(d.gratuity);
+  const printed = d.printed_total == null ? 0 : cents(d.printed_total);
+  if (tax <= 0) return false;
+  if (printed > 0 && items > 0) {
+    if (Math.abs(items + rest + tax - printed) <= 2) return false; // added on top
+    if (Math.abs(items + rest - printed) <= 2) return true;        // already inside
+  }
+  return d.tax_included === true;
+}
+
+function readTotal(d, included) {
   const lines =
     (d.items || []).reduce((a, it) => a + cents(it.p), 0) +
-    cents(d.tax) + cents(d.fee) + cents(d.gratuity);
+    (included ? 0 : cents(d.tax)) + cents(d.fee) + cents(d.gratuity);
   if (lines <= 0) return null;
 
   // Not less than what's printed, and not a tip over half the bill — that's
@@ -118,9 +140,11 @@ export async function POST(req) {
       const d = JSON.parse(text);
       // Offered as a starting point for the payer to check, never as a fact.
       // Blank when it isn't certain: they type it themselves, as before.
-      const total = readTotal(d);
+      const included = taxIsIncluded(d);
+      const total = readTotal(d, included);
       for (const k of ["printed_total", "tip_line", "written_total", "written_tip"]) delete d[k];
       d.gratuity = Number(d.gratuity) || 0;
+      d.tax_included = included;
       return Response.json({ ...d, total: total == null ? null : total / 100 });
     } catch {
       return Response.json({ error: "could not read that image" }, { status: 500 });
