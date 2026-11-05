@@ -48,6 +48,11 @@ function NewBill() {
   const [items, setItems] = useState([]);
   const [printedSubtotal, setPrintedSubtotal] = useState(0); // cross-check only
   const [tax, setTax] = useState("");
+  // In Mexico the prices already contain IVA and the line at the bottom only
+  // breaks it out, so adding it would charge the table twice. In the US it is
+  // added on top. The scan decides from the receipt's own arithmetic; this is
+  // the payer's override.
+  const [taxIncl, setTaxIncl] = useState(false);
   // Held only while they're typing in the tip box, so the number doesn't
   // reformat itself under the cursor. Null the rest of the time, when the
   // box simply shows the total minus everything printed.
@@ -86,6 +91,7 @@ function NewBill() {
       setItems((d.items || []).map((it) => ({ name: it.n, price: String(it.p) })));
       setPrintedSubtotal(toCents(d.subtotal));
       setTax(String(d.tax ?? 0));
+      setTaxIncl(d.tax_included === true);
       setFee(String(d.fee ?? 0));
       setGrat(Number(d.gratuity) > 0 ? String(d.gratuity) : "");
       // The scan fills the total in only when it could read the handwriting
@@ -112,7 +118,9 @@ function NewBill() {
   const itemsSum = items.reduce((a, it) => a + toCents(it.price), 0);
   const gratCents = toCents(grat);
   const hasGrat = grat !== "";
-  const printed = itemsSum + toCents(tax) + toCents(fee) + gratCents;
+  const taxCents = toCents(tax);
+  const taxAdded = taxIncl ? 0 : taxCents;
+  const printed = itemsSum + taxAdded + toCents(fee) + gratCents;
   const totalCents = toCents(total);
 
   // Anything above the printed lines was added by hand, on top of whatever
@@ -127,7 +135,8 @@ function NewBill() {
   const pctBill = beforeTip > 0 ? (tipCents / beforeTip) * 100 : 0;
   const pct = (n) => (n >= 10 ? Math.round(n) : Math.round(n * 10) / 10);
 
-  const missedLine = printedSubtotal > 0 && Math.abs(printedSubtotal - itemsSum) > 2;
+  const expectedLines = printedSubtotal + (taxIncl ? taxCents : 0);
+  const missedLine = printedSubtotal > 0 && Math.abs(expectedLines - itemsSum) > 2;
   const totalTooLow = totalCents > 0 && addedCents < 0;
   const tipOdd = totalCents > 0 && addedCents >= 0 && (pctFood > 40 || (pctFood < 5 && tipCents > 0));
 
@@ -161,7 +170,7 @@ function NewBill() {
         pay_name: payerName.trim(),
         pay: methods,
         total_cents: totalCents,
-        tax_cents: toCents(tax),
+        tax_cents: taxAdded,   // nothing to add when it's already in the prices
         fee_cents: toCents(fee),
         tip_cents: Math.max(0, tipCents),   // printed gratuity plus anything added
         items: items
@@ -318,8 +327,18 @@ function NewBill() {
 
               <div className={(hasGrat ? "grid3" : "grid2") + " inline"} style={{ marginTop: 18 }}>
                 <div className="fld">
-                  <label>Tax</label>
-                  <input value={tax} inputMode="decimal" onChange={(e) => setTax(e.target.value)} />
+                  <label>
+                    Tax{" "}
+                    <button className="mini" onClick={() => setTaxIncl(!taxIncl)}>
+                      {taxIncl ? "in the prices" : "added on"}
+                    </button>
+                  </label>
+                  <input
+                    className={taxIncl ? "muted" : ""}
+                    value={tax}
+                    inputMode="decimal"
+                    onChange={(e) => setTax(e.target.value)}
+                  />
                 </div>
                 {hasGrat && (
                   <div className="fld">
@@ -335,7 +354,7 @@ function NewBill() {
 
               {missedLine && (
                 <div className="flag amber" style={{ marginTop: 12 }}>
-                  The receipt prints a subtotal of {fmt(printedSubtotal)}, but these lines add up
+                  The receipt&apos;s lines should come to {fmt(expectedLines)}, but these add up
                   to {fmt(itemsSum)}. The scan probably missed an item or misread a price.
                 </div>
               )}
