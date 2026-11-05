@@ -66,6 +66,10 @@ input:focus{border-color:var(--marine);outline:none;}
    this row's right edge level with the item prices, which sit inside a row
    that ends with a remove button */
 .grid2 input,.grid3 input{text-align:right;}
+/* a tax that's already inside the prices is there to check against the
+   receipt, not to be added, so it reads as information rather than input */
+.grid2 input.muted,.grid3 input.muted{color:var(--ink2);background:#F4F5F1;}
+.fld label .mini{font-size:11px;}
 .grid2.inline,.grid3.inline{padding-right:24px;}
 
 .drop{border:2px dashed var(--stone);border-radius:14px;background:var(--card);
