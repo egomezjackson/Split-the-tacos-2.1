@@ -364,10 +364,16 @@ function NewBill() {
               <div className="totals">
                 <div className="lline">
                   <span>Printed lines come to</span>
-                  <b className="num">{fmt(printed)}</b>
+                  <b className="num">{fmt(printed - gratCents)}</b>
                 </div>
+                {gratCents > 0 && (
+                  <div className="lline">
+                    <span>Gratuity already on the bill</span>
+                    <b className="num">{fmt(gratCents)}</b>
+                  </div>
+                )}
                 <div className="lline tiprow">
-                  <span>{gratCents > 0 ? "Extra tip" : "Tip"}</span>
+                  <span>{gratCents > 0 ? "Anything you added on top" : "Tip"}</span>
                   <input
                     className="tipin"
                     value={tipRaw !== null ? tipRaw : totalCents > 0 ? (addedCents / 100).toFixed(2) : ""}
@@ -383,7 +389,7 @@ function NewBill() {
                 </div>
                 {tipCents > 0 && !totalTooLow && (
                   <div className="pcts">
-                    {gratCents > 0 && `with gratuity, ${fmt(tipCents)} — `}
+                    {gratCents > 0 && `${fmt(tipCents)} of tip in all — `}
                     {pct(pctFood)}% on the food · {pct(pctBill)}% on the whole bill
                   </div>
                 )}
