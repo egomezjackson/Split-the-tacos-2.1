@@ -16,15 +16,20 @@ const admin = createClient(
 
 const PROMPT =
   "Read this receipt. Return ONLY a JSON object — no markdown fences, no commentary:\n" +
-  '{"merchant":string,"items":[{"n":string,"p":number}],"subtotal":number,"tax":number,' +
+  '{"merchant":string,"items":[{"n":string,"q":number,"p":number}],"subtotal":number,"tax":number,' +
   '"fee":number,"tax_included":boolean,"gratuity":number,"printed_total":number|null,' +
   '"tip_line":"none"|"blank"|"written",' +
   '"written_total":number|null,"written_tip":number|null}\n' +
   "Rules:\n" +
   "- items, subtotal, tax, fee, gratuity and printed_total come from machine-printed\n" +
   "  text ONLY.\n" +
-  "- If a line has quantity 2 or more, emit that many separate entries so each can be claimed individually.\n" +
-  '- "p" is the price of ONE unit.\n' +
+  "- ONE entry per printed line, however many that line is for. Never split a\n" +
+  "  line into several entries and never merge two lines into one.\n" +
+  '- "q" is the quantity printed for that line (the CANT. or QTY column), 1 when\n' +
+  "  the line shows no quantity. A whole number.\n" +
+  '- "p" is the amount printed at the end of that line (the IMPORTE or AMOUNT\n' +
+  "  column) — the whole line, not one unit. Copy it as printed; do not divide\n" +
+  "  it by the quantity and do not multiply it.\n" +
   '- "subtotal" is the printed subtotal before tax. 0 if not printed.\n' +
   '- "tax_included" is true when the tax is ALREADY inside the item prices and\n' +
   "  the line at the bottom only breaks it out — normal in Mexico, where menu\n" +
@@ -53,6 +58,17 @@ const PROMPT =
   "- Numbers, not strings. No currency symbols.";
 
 const cents = (v) => (Number.isFinite(Number(v)) ? Math.round(Number(v) * 100) : 0);
+
+// A line reading "10 TACOS 250.00" has to become ten things people can claim
+// one each. Asking the model for ten identical entries works at 2 and 3 and
+// quietly fails at 10, which is how a table of ten tacos arrived as one item
+// nobody could divide. It now reports the quantity and the printed line
+// amount, and the splitting happens here, where it can't be forgotten.
+const MAX_QTY = 60;
+const qty = (v) => {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) && n > 1 ? Math.min(n, MAX_QTY) : 1;
+};
 
 // What may be filled into the total box. Every share is worked out from this
 // number, so a misread is silent and expensive: anything the printed lines
@@ -140,6 +156,7 @@ export async function POST(req) {
       const d = JSON.parse(text);
       // Offered as a starting point for the payer to check, never as a fact.
       // Blank when it isn't certain: they type it themselves, as before.
+      d.items = (d.items || []).map((it) => ({ n: it.n, q: qty(it.q), p: Number(it.p) || 0 }));
       const included = taxIsIncluded(d);
       const total = readTotal(d, included);
       for (const k of ["printed_total", "tip_line", "written_total", "written_tip"]) delete d[k];
