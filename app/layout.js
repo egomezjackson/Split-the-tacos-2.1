@@ -70,6 +70,8 @@ input:focus{border-color:var(--marine);outline:none;}
    receipt, not to be added, so it reads as information rather than input */
 .grid2 input.muted,.grid3 input.muted{color:var(--ink2);background:#F4F5F1;}
 .fld label .mini{font-size:11px;}
+/* how many that printed line was for */
+.qty{width:52px;flex:0 0 52px;text-align:center;padding-left:6px;padding-right:6px;}
 .grid2.inline,.grid3.inline{padding-right:24px;}
 
 .drop{border:2px dashed var(--stone);border-radius:14px;background:var(--card);
