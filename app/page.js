@@ -20,6 +20,26 @@ import {
  * what you owe and how to pay, then a receipt once the payer marks it
  * received. The payer's own phone gets the ledger instead.
  */
+// "10 TACOS 250.00" is one printed line but ten things to claim, so it becomes
+// ten rows of 25.00. The pennies of a line that doesn't divide evenly are
+// handed out one each, so the rows still add up to the printed amount exactly.
+const MAX_QTY = 60;
+
+function expandItems(items) {
+  const out = [];
+  for (const it of items) {
+    const line = toCents(it.price);
+    if (!it.name && !line) continue;
+    const n = Math.min(Math.max(parseInt(it.qty, 10) || 1, 1), MAX_QTY);
+    const base = Math.floor(line / n);
+    const rem = line - base * n;
+    for (let k = 0; k < n; k++) {
+      out.push({ name: it.name, price_cents: base + (k < rem ? 1 : 0) });
+    }
+  }
+  return out;
+}
+
 export default function Page() {
   // Registers the service worker. It caches nothing that matters — it exists so
   // Chrome will offer "install", and so the app opens when there's no signal.
@@ -88,7 +108,13 @@ function NewBill() {
       const d = await r.json();
       if (d.error) throw new Error();
       setMerchant(d.merchant || "");
-      setItems((d.items || []).map((it) => ({ name: it.n, price: String(it.p) })));
+      setItems(
+        (d.items || []).map((it) => ({
+          name: it.n,
+          qty: it.q > 1 ? String(it.q) : "",
+          price: String(it.p),
+        }))
+      );
       setPrintedSubtotal(toCents(d.subtotal));
       setTax(String(d.tax ?? 0));
       setTaxIncl(d.tax_included === true);
@@ -105,7 +131,7 @@ function NewBill() {
       }, 200);
     } catch {
       setError("Couldn't read that one. Try a brighter, straighter photo — or type the lines in.");
-      setItems([{ name: "", price: "" }]);
+      setItems([{ name: "", qty: "", price: "" }]);
     }
     setReading(false);
   };
@@ -173,9 +199,7 @@ function NewBill() {
         tax_cents: taxAdded,   // nothing to add when it's already in the prices
         fee_cents: toCents(fee),
         tip_cents: Math.max(0, tipCents),   // printed gratuity plus anything added
-        items: items
-          .filter((it) => it.name || toCents(it.price))
-          .map((it) => ({ name: it.name, price_cents: toCents(it.price) })),
+        items: expandItems(items),
       }),
     });
     const d = await r.json();
@@ -238,7 +262,7 @@ function NewBill() {
                 Upload
               </button>
             </div>
-            <button className="mini" onClick={() => setItems([{ name: "", price: "" }])}>
+            <button className="mini" onClick={() => setItems([{ name: "", qty: "", price: "" }])}>
               or type it in
             </button>
           </div>
@@ -289,6 +313,9 @@ function NewBill() {
             <div className="sec">
               <div className="sechead">
                 <h2>{merchant || "The printed lines"}</h2>
+                {/* Which number is which. The columns match the receipt's own
+                    CANT. and IMPORTE, so people copy rather than calculate. */}
+                <span>How many · line total</span>
               </div>
 
               <div className="fld" style={{ marginBottom: 10 }}>
@@ -306,10 +333,22 @@ function NewBill() {
                     placeholder="Item"
                     onChange={(e) => setItem(i, { name: e.target.value })}
                   />
+                  {/* How many that line is for, so ten tacos become ten things
+                      to claim. The price beside it is the whole line, as the
+                      receipt prints it. */}
+                  <input
+                    value={it.qty || ""}
+                    inputMode="numeric"
+                    placeholder="1"
+                    aria-label="How many"
+                    className="qty"
+                    onChange={(e) => setItem(i, { qty: e.target.value.replace(/[^0-9]/g, "") })}
+                  />
                   <input
                     value={it.price}
                     inputMode="decimal"
                     placeholder="0.00"
+                    aria-label="Line total"
                     style={{ width: 86, flex: "0 0 86px", textAlign: "right" }}
                     onChange={(e) => setItem(i, { price: e.target.value })}
                   />
@@ -320,7 +359,7 @@ function NewBill() {
               ))}
               <button
                 className="btn ghost sm"
-                onClick={() => setItems([...items, { name: "", price: "" }])}
+                onClick={() => setItems([...items, { name: "", qty: "", price: "" }])}
               >
                 Add a line
               </button>
